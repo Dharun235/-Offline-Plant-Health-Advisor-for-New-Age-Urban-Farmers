@@ -4,36 +4,36 @@ Edit this file to change models, paths, and the system prompt.
 """
 
 import os
+from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# Ollama settings
-# ---------------------------------------------------------------------------
-OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-
-# Model used for plain text conversations and RAG-backed answers.
-# Run `ollama pull llama3.2` to download it before starting the app.
-TEXT_MODEL: str = os.getenv("TEXT_MODEL", "llama3.2")
-
-# Model used when an image is attached to the user's message.
-# Run `ollama pull llava` to download it before starting the app.
-VISION_MODEL: str = os.getenv("VISION_MODEL", "llava")
-
-# ---------------------------------------------------------------------------
-# RAG / document settings
+# Local model settings
 # ---------------------------------------------------------------------------
 
-# Where uploaded files are stored on disk.
-UPLOAD_DIR: str = os.path.join(os.path.dirname(__file__), "data", "uploads")
+# Primary standalone multimodal model.
+MULTIMODAL_MODEL_ID: str = os.getenv(
+	"MULTIMODAL_MODEL_ID",
+	"HuggingFaceTB/SmolVLM-256M-Instruct",
+)
 
-# Where ChromaDB persists the vector store.
-VECTORSTORE_DIR: str = os.path.join(os.path.dirname(__file__), "data", "vectorstore")
+# Resolve repo-local model path by default so local + Docker can run fully offline.
+_DEFAULT_LOCAL_MODEL_DIR = (
+	Path(__file__).resolve().parent.parent / "models" / "SmolVLM-256M-Instruct"
+)
 
-# Characters per document chunk (approximate; overlapping chunks help context).
-CHUNK_SIZE: int = 800
-CHUNK_OVERLAP: int = 100
+# Optional local directory for fully offline deployment.
+# Example: /home/pi/models/SmolVLM-256M-Instruct
+LOCAL_MULTIMODAL_MODEL_DIR: str = os.getenv(
+	"LOCAL_MULTIMODAL_MODEL_DIR",
+	str(_DEFAULT_LOCAL_MODEL_DIR),
+)
 
-# Number of document chunks retrieved for each user query.
-TOP_K_DOCS: int = 4
+# Generation limits for local inference.
+MAX_NEW_TOKENS: int = int(os.getenv("MAX_NEW_TOKENS", "256"))
+TEMPERATURE: float = float(os.getenv("TEMPERATURE", "0.2"))
+
+# Keep only the latest N user/assistant turns when building prompt history.
+MAX_HISTORY_TURNS: int = int(os.getenv("MAX_HISTORY_TURNS", "4"))
 
 # ---------------------------------------------------------------------------
 # System prompt
@@ -48,5 +48,4 @@ Guidelines:
 - Suggest organic or low-cost remedies where possible.
 - If you are unsure, say so clearly rather than guessing.
 - Keep answers concise and farmer-friendly; avoid excessive jargon.
-- When relevant document context is provided, prioritise information from those documents.
 """

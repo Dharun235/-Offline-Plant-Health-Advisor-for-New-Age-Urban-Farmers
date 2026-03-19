@@ -1,78 +1,145 @@
 """
-Core chatbot logic.
-
-Handles communication with Ollama for:
-  - Text-only chat (with optional RAG context from uploaded documents)
-  - Vision chat (text + image sent to the vision model)
-
-Maintains a rolling conversation history so the model has context across turns.
+Core chatbot logic for Offline Plant Health Advisor.
 """
 
 from __future__ import annotations
-
-import base64
+from functools import lru_cache
+import io
 from pathlib import Path
-from typing import List, Tuple
+from typing import Any, List, Tuple
 
-import ollama
+import torch
+from PIL import Image
+import transformers
 
-from config import OLLAMA_BASE_URL, SYSTEM_PROMPT, TEXT_MODEL, VISION_MODEL
-from rag import retrieve_context
+from config import (
+    LOCAL_MULTIMODAL_MODEL_DIR,
+    MAX_HISTORY_TURNS,
+    MAX_NEW_TOKENS,
+    SYSTEM_PROMPT,
+    TEMPERATURE,
+)
 
 # Chat history type: list of (user_message, assistant_response) pairs.
 History = List[Tuple[str, str]]
 
 
-def _encode_image(image_path: str) -> str:
-    """Return a base64-encoded string for the given image file."""
+def _model_source() -> str:
+    model_dir = (LOCAL_MULTIMODAL_MODEL_DIR or "").strip()
+    if not model_dir:
+        raise RuntimeError(
+            "LOCAL_MULTIMODAL_MODEL_DIR is not set. "
+            "For full offline mode, point it to your local model folder."
+        )
+
+    resolved = Path(model_dir).expanduser().resolve()
+    if not resolved.exists():
+        raise FileNotFoundError(
+            f"Local model directory not found: {resolved}. "
+            "Download/copy SmolVLM files into this folder."
+        )
+    return str(resolved)
+
+
+@lru_cache(maxsize=1)
+def _get_processor() -> Any:
+    return transformers.AutoProcessor.from_pretrained(
+        _model_source(),
+        local_files_only=True,
+        trust_remote_code=True,
+    )
+
+
+@lru_cache(maxsize=1)
+def _get_model() -> Any:
+    auto_model_cls = getattr(transformers, "AutoModelForImageTextToText")
+    model = auto_model_cls.from_pretrained(
+        _model_source(),
+        local_files_only=True,
+        trust_remote_code=True,
+        low_cpu_mem_usage=True,
+    )
+    model.eval()
+    return model
+
+
+def _normalize_image_bytes(image_path: str) -> bytes:
+    """
+    Read an image and normalize it to PNG bytes.
+
+    This avoids crashes in some vision runners when they receive
+    unsupported/corrupt bytes from temporary uploads.
+    """
+    from PIL import Image
+
     with open(image_path, "rb") as f:
-        return base64.b64encode(f.read()).decode("utf-8")
+        raw = f.read()
+
+    try:
+        with Image.open(io.BytesIO(raw)) as img:
+            img = img.convert("RGB")
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            return buf.getvalue()
+    except Exception as exc:
+        raise ValueError(
+            "Invalid or unsupported image file. Please upload a standard JPG/PNG image."
+        ) from exc
 
 
-def _build_messages(
+def _load_image(image_path: str) -> Image.Image:
+    return Image.open(io.BytesIO(_normalize_image_bytes(image_path))).convert("RGB")
+
+
+def _build_prompt_messages(
     user_text: str,
     history: History,
-    rag_context: str = "",
     image_path: str | None = None,
-) -> list:
+) -> tuple[list[dict[str, object]], list[Image.Image]]:
     """
-    Assemble the full message list to send to Ollama.
-
-    Structure:
-      1. System prompt (agriculture-tuned)
-      2. Conversation history (alternating user/assistant)
-      3. (Optional) RAG context injected as a system note
-      4. Current user message (with optional image)
+    Assemble messages for the local multimodal model.
     """
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages: list[dict[str, object]] = []
+    images: list[Image.Image] = []
 
-    # Conversation history
-    for user_msg, assistant_msg in history:
-        messages.append({"role": "user", "content": user_msg})
-        messages.append({"role": "assistant", "content": assistant_msg})
+    history_to_use = history[-MAX_HISTORY_TURNS:] if MAX_HISTORY_TURNS > 0 else history
 
-    # Inject retrieved document context before the current user turn
-    if rag_context:
-        context_note = (
-            "The following excerpts are from documents the user uploaded. "
-            "Use them to inform your answer where relevant.\n\n"
-            f"{rag_context}"
-        )
-        messages.append({"role": "system", "content": context_note})
+    messages.append(
+        {
+            "role": "system",
+            "content": [{"type": "text", "text": SYSTEM_PROMPT}],
+        }
+    )
 
-    # Current user message
+    for user_msg, assistant_msg in history_to_use:
+        if user_msg:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": [{"type": "text", "text": user_msg}],
+                }
+            )
+        if assistant_msg:
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": assistant_msg}],
+                }
+            )
+
+    content: list[dict[str, str]] = []
     if image_path:
-        messages.append(
-            {
-                "role": "user",
-                "content": user_text or "What can you tell me about this plant?",
-                "images": [_encode_image(image_path)],
-            }
-        )
-    else:
-        messages.append({"role": "user", "content": user_text})
+        images.append(_load_image(image_path))
+        content.append({"type": "image"})
+    content.append(
+        {
+            "type": "text",
+            "text": user_text or "Please analyze this plant image.",
+        }
+    )
+    messages.append({"role": "user", "content": content})
 
-    return messages
+    return messages, images
 
 
 def chat(
@@ -81,46 +148,44 @@ def chat(
     image_path: str | None = None,
 ) -> str:
     """
-    Send a message to the appropriate Ollama model and return the response text.
-
-    - If *image_path* is provided, the vision model is used.
-    - Otherwise RAG context is retrieved and the text model is used.
+    Send a message to the local multimodal model and return the reply.
     """
-    rag_context = ""
-    model = TEXT_MODEL
-
-    if image_path:
-        model = VISION_MODEL
-    else:
-        rag_context = retrieve_context(user_text)
-
-    messages = _build_messages(
+    messages, images = _build_prompt_messages(
         user_text=user_text,
         history=history,
-        rag_context=rag_context,
         image_path=image_path,
     )
 
-    client = ollama.Client(host=OLLAMA_BASE_URL)
-    response = client.chat(model=model, messages=messages)
-    return response["message"]["content"]
+    processor = _get_processor()
+    model = _get_model()
+    prompt = processor.apply_chat_template(messages, add_generation_prompt=True)
+    inputs = processor(text=prompt, images=images or None, return_tensors="pt")
+
+    with torch.inference_mode():
+        generated_ids = model.generate(
+            **inputs,
+            max_new_tokens=MAX_NEW_TOKENS,
+            do_sample=TEMPERATURE > 0,
+            temperature=TEMPERATURE,
+        )
+
+    prompt_length = inputs["input_ids"].shape[1]
+    response_ids = generated_ids[:, prompt_length:]
+    return processor.batch_decode(response_ids, skip_special_tokens=True)[0].strip()
 
 
-def check_ollama_available() -> bool:
-    """Return True if the Ollama server is reachable."""
+def check_backend_available() -> bool:
+    """Return True if the configured local model can be resolved."""
     try:
-        client = ollama.Client(host=OLLAMA_BASE_URL)
-        client.list()
+        _get_processor()
         return True
     except Exception:
         return False
 
 
 def list_available_models() -> List[str]:
-    """Return the names of all models downloaded in Ollama."""
+    """Return the configured local model identifier."""
     try:
-        client = ollama.Client(host=OLLAMA_BASE_URL)
-        result = client.list()
-        return [m["name"] for m in result.get("models", [])]
+        return [_model_source()]
     except Exception:
         return []

@@ -10,98 +10,99 @@ Then open http://localhost:7860 in your browser.
 from __future__ import annotations
 
 import os
-import shutil
 import sys
-from pathlib import Path
-from typing import List, Tuple
+from typing import Any, List
 
 import gradio as gr
 
 # Make sibling modules importable when running from the repo root.
 sys.path.insert(0, os.path.dirname(__file__))
 
-from chatbot import chat, check_ollama_available, list_available_models
-from config import TEXT_MODEL, UPLOAD_DIR, VISION_MODEL
-from rag import clear_documents, ingest_documents
-
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+from chatbot import chat, check_backend_available, list_available_models
+from config import MULTIMODAL_MODEL_ID, LOCAL_MULTIMODAL_MODEL_DIR
 
 # ---------------------------------------------------------------------------
 # Gradio event handlers
 # ---------------------------------------------------------------------------
 
-def handle_send(
-    user_text: str,
-    image: str | None,
-    history: List[Tuple[str, str]],
-) -> Tuple[str, str | None, List[Tuple[str, str]]]:
-    """
-    Called when the user clicks Send.
+def _content_to_text(content: Any) -> str:
+    """Convert Gradio Chatbot content payloads to plain text."""
+    if isinstance(content, str):
+        return content
 
-    Returns:
-        - Cleared text box value
-        - Cleared image value
-        - Updated chat history
-    """
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, dict):
+                # Gradio message segments can look like:
+                # {"type": "text", "text": "..."}
+                text = item.get("text") or item.get("value")
+                if isinstance(text, str):
+                    parts.append(text)
+            elif isinstance(item, str):
+                parts.append(item)
+        return "\n".join(p for p in parts if p).strip()
+
+    return ""
+
+def handle_send(user_text: str, image: str | None, history: List[dict] | None):
+    history = history or []
     if not user_text.strip() and image is None:
         return "", None, history
 
-    response = chat(
-        user_text=user_text.strip(),
-        history=history,
-        image_path=image,
-    )
-    history = history + [(user_text.strip() or "📷 [image]", response)]
-    return "", None, history
+    # Convert Gradio history to list of (user, assistant) tuples expected by backend
+    tuple_history = []
+    pending_user = ""
+    for message in history:
+        role = message.get("role")
+        text = _content_to_text(message.get("content", ""))
 
+        if role == "user":
+            pending_user = text
+        elif role == "assistant":
+            if pending_user or text:
+                tuple_history.append((pending_user, text))
+            pending_user = ""
 
-def handle_upload_docs(files: List[str]) -> str:
-    """
-    Index uploaded documents into the vector store.
-    Gradio passes a list of temporary file paths.
-    """
-    if not files:
-        return "⚠️ No files selected."
-
-    saved_paths = []
-    for tmp_path in files:
-        dest = os.path.join(UPLOAD_DIR, Path(tmp_path).name)
-        shutil.copy(tmp_path, dest)
-        saved_paths.append(dest)
+    # Ignore trailing unmatched user turn, because current user turn is sent separately.
 
     try:
-        num_chunks = ingest_documents(saved_paths)
-        names = ", ".join(Path(p).name for p in saved_paths)
-        return f"✅ Indexed {len(saved_paths)} file(s) ({num_chunks} chunks): {names}"
+        response = chat(
+            user_text=user_text.strip(),
+            history=tuple_history,
+            image_path=image,
+        )
     except Exception as exc:
-        return f"❌ Error indexing documents: {exc}"
+        response = (
+            "⚠️ I couldn’t get a response from the local model. "
+            "This usually means the model ran out of memory or failed to load. "
+            "Please check your model path/config and try again. "
+            f"\n\nDetails: {exc}"
+        )
 
-
-def handle_clear_docs() -> str:
-    """Wipe the vector store and upload cache."""
-    clear_documents()
-    return "🗑️ All uploaded documents cleared."
+    # Append new messages in Gradio format
+    history = history + [
+        {"role": "user", "content": user_text.strip() or "📷 [image]"},
+        {"role": "assistant", "content": response},
+    ]
+    return "", None, history
 
 
 def _status_message() -> str:
     """Build the status string shown at startup."""
-    if check_ollama_available():
-        models = list_available_models()
-        model_list = ", ".join(models) if models else "none downloaded yet"
-        text_ok = TEXT_MODEL in " ".join(models)
-        vision_ok = VISION_MODEL in " ".join(models)
-        warnings = []
-        if not text_ok:
-            warnings.append(f"`{TEXT_MODEL}` not found — run: ollama pull {TEXT_MODEL}")
-        if not vision_ok:
-            warnings.append(f"`{VISION_MODEL}` not found — run: ollama pull {VISION_MODEL}")
-        status = f"✅ Ollama connected. Available models: {model_list}"
-        if warnings:
-            status += "\n⚠️ " + "\n⚠️ ".join(warnings)
+    if check_backend_available():
+        model_list = ", ".join(list_available_models())
+        configured_source = LOCAL_MULTIMODAL_MODEL_DIR or MULTIMODAL_MODEL_ID
+        status = (
+            "✅ Local multimodal backend ready. "
+            f"Configured model: {configured_source}"
+        )
+        if model_list:
+            status += f"\n📦 Active model source: {model_list}"
     else:
         status = (
-            "❌ Ollama is not running. "
-            "Please start it with `ollama serve` and refresh this page."
+            "⚠️ Local multimodal model is not ready. "
+            "Set `LOCAL_MULTIMODAL_MODEL_DIR` in config for offline use, or ensure the Hugging Face model can be downloaded on first run."
         )
     return status
 
@@ -112,27 +113,26 @@ def _status_message() -> str:
 
 with gr.Blocks(
     title="🌿 Offline Plant Health Advisor",
-    theme=gr.themes.Soft(primary_hue="green"),
 ) as demo:
 
     gr.Markdown(
         """
         # 🌿 Offline Plant Health Advisor
         **AI-powered crop health assistant — runs 100% offline on your PC.**
-        Upload plant photos or farming documents and ask anything about your crops.
+        Upload plant photos and ask anything about your crops.
         """
     )
 
     with gr.Row():
         status_box = gr.Textbox(
-            label="Ollama Status",
+            label="Backend Status",
             value=_status_message(),
             interactive=False,
             lines=2,
         )
 
     # Chat area
-    chatbot_ui = gr.Chatbot(label="Chat", height=420, bubble_full_width=False)
+    chatbot_ui = gr.Chatbot(label="Chat", height=420)
 
     with gr.Row():
         text_input = gr.Textbox(
@@ -150,26 +150,6 @@ with gr.Blocks(
     with gr.Row():
         send_btn = gr.Button("Send 💬", variant="primary", scale=3)
         clear_chat_btn = gr.Button("Clear chat 🗑️", scale=1)
-
-    gr.Markdown("---")
-    gr.Markdown("### 📄 Upload Documents (PDF / TXT / Markdown)")
-    gr.Markdown(
-        "Upload farming guides, crop manuals, or research papers. "
-        "The chatbot will answer questions using their content."
-    )
-
-    with gr.Row():
-        doc_upload = gr.File(
-            label="Select files",
-            file_count="multiple",
-            file_types=[".pdf", ".txt", ".md"],
-            scale=4,
-        )
-        with gr.Column(scale=2):
-            upload_btn = gr.Button("Index documents 📚", variant="secondary")
-            clear_docs_btn = gr.Button("Clear documents 🗑️")
-
-    doc_status = gr.Textbox(label="Document status", interactive=False)
 
     # -----------------------------------------------------------------------
     # Wire up events
@@ -191,17 +171,11 @@ with gr.Blocks(
         outputs=[chatbot_ui, text_input, image_input],
     )
 
-    upload_btn.click(
-        fn=handle_upload_docs,
-        inputs=[doc_upload],
-        outputs=[doc_status],
-    )
-
-    clear_docs_btn.click(
-        fn=handle_clear_docs,
-        outputs=[doc_status],
-    )
-
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7860, share=False)
+    demo.launch(
+        server_name="0.0.0.0",
+        server_port=7860,
+        share=False,
+        theme=gr.themes.Soft(primary_hue="green"),
+    )

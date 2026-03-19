@@ -1,0 +1,23 @@
+services:
+  plant-advisor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: offline-plant-advisor:latest
+    container_name: offline-plant-advisor
+    env_file:
+      - .env
+    ports:
+      - "7860:7860"
+    environment:
+      # Strict offline mode: local model path only.
+      LOCAL_MULTIMODAL_MODEL_DIR: ${LOCAL_MULTIMODAL_MODEL_DIR:-/models/SmolVLM-256M-Instruct}
+      HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-1}
+      TRANSFORMERS_OFFLINE: ${TRANSFORMERS_OFFLINE:-1}
+      MAX_NEW_TOKENS: ${MAX_NEW_TOKENS:-256}
+      TEMPERATURE: ${TEMPERATURE:-0.2}
+      MAX_HISTORY_TURNS: ${MAX_HISTORY_TURNS:-4}
+    volumes:
+      # Put pre-downloaded model folders under ./models on host for offline use
+      - ./models:/models
+    restart: unless-stopped
