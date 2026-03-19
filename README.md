@@ -1,10 +1,10 @@
 # Offline Plant Health Advisor
 
-This project is a local chatbot for plant health support. You can chat with text, upload a plant image, and get guidance on common disease or care issues.
+This project provides a local chatbot for plant health support. It accepts text and plant images and returns practical guidance for common disease and care issues.
 
-It is set up to run offline using a local model folder.
+The application is configured for offline operation with a local model directory.
 
-## What it does
+## Features
 
 - Text chat for plant and crop questions
 - Image + text analysis for visible symptoms
@@ -40,7 +40,7 @@ Important environment variables:
 - `TEMPERATURE`
 - `MAX_HISTORY_TURNS`
 
-## Docker (macOS + Raspberry Pi)
+## Docker (macOS and Raspberry Pi)
 
 Files used:
 
@@ -48,21 +48,21 @@ Files used:
 - [docker-compose.yml](docker-compose.yml)
 - [.env.example](.env.example)
 
-### 1) Download model files once
+### 1) Download model files
 
-Do this on a machine with internet:
+Run once on a machine with internet access:
 
 ```bash
 huggingface-cli download HuggingFaceTB/SmolVLM-256M-Instruct --local-dir ./models/SmolVLM-256M-Instruct
 ```
 
-### 2) Create env file
+### 2) Create the environment file
 
 ```bash
 cp .env.example .env
 ```
 
-### 3) Run with Docker
+### 3) Start the service
 
 ```bash
 docker compose up --build

@@ -19,7 +19,7 @@ import gradio as gr
 sys.path.insert(0, os.path.dirname(__file__))
 
 from chatbot import chat, check_backend_available, list_available_models
-from config import MULTIMODAL_MODEL_ID, LOCAL_MULTIMODAL_MODEL_DIR
+from config import LOCAL_MULTIMODAL_MODEL_DIR
 
 # ---------------------------------------------------------------------------
 # Gradio event handlers
@@ -74,7 +74,7 @@ def handle_send(user_text: str, image: str | None, history: List[dict] | None):
         )
     except Exception as exc:
         response = (
-            "⚠️ I couldn’t get a response from the local model. "
+            "Unable to get a response from the local model. "
             "This usually means the model ran out of memory or failed to load. "
             "Please check your model path/config and try again. "
             f"\n\nDetails: {exc}"
@@ -82,7 +82,7 @@ def handle_send(user_text: str, image: str | None, history: List[dict] | None):
 
     # Append new messages in Gradio format
     history = history + [
-        {"role": "user", "content": user_text.strip() or "📷 [image]"},
+        {"role": "user", "content": user_text.strip() or "[image]"},
         {"role": "assistant", "content": response},
     ]
     return "", None, history
@@ -92,17 +92,17 @@ def _status_message() -> str:
     """Build the status string shown at startup."""
     if check_backend_available():
         model_list = ", ".join(list_available_models())
-        configured_source = LOCAL_MULTIMODAL_MODEL_DIR or MULTIMODAL_MODEL_ID
+        configured_source = LOCAL_MULTIMODAL_MODEL_DIR
         status = (
-            "✅ Local multimodal backend ready. "
+            "Local multimodal backend is ready. "
             f"Configured model: {configured_source}"
         )
         if model_list:
-            status += f"\n📦 Active model source: {model_list}"
+            status += f"\nActive model source: {model_list}"
     else:
         status = (
-            "⚠️ Local multimodal model is not ready. "
-            "Set `LOCAL_MULTIMODAL_MODEL_DIR` in config for offline use, or ensure the Hugging Face model can be downloaded on first run."
+            "Local multimodal model is not ready. "
+            "Set LOCAL_MULTIMODAL_MODEL_DIR in config for offline use."
         )
     return status
 
@@ -112,19 +112,18 @@ def _status_message() -> str:
 # ---------------------------------------------------------------------------
 
 with gr.Blocks(
-    title="🌿 Offline Plant Health Advisor",
+    title="Offline Plant Health Advisor",
 ) as demo:
 
     gr.Markdown(
         """
-        # 🌿 Offline Plant Health Advisor
-        **AI-powered crop health assistant — runs 100% offline on your PC.**
-        Upload plant photos and ask anything about your crops.
+        # Offline Plant Health Advisor
+        Local assistant for plant health guidance using text and image input.
         """
     )
 
     with gr.Row():
-        status_box = gr.Textbox(
+        gr.Textbox(
             label="Backend Status",
             value=_status_message(),
             interactive=False,
@@ -142,14 +141,14 @@ with gr.Blocks(
             lines=2,
         )
         image_input = gr.Image(
-            label="📷 Plant photo (optional)",
+            label="Plant image (optional)",
             type="filepath",
             scale=2,
         )
 
     with gr.Row():
-        send_btn = gr.Button("Send 💬", variant="primary", scale=3)
-        clear_chat_btn = gr.Button("Clear chat 🗑️", scale=1)
+        send_btn = gr.Button("Send", variant="primary", scale=3)
+        clear_chat_btn = gr.Button("Clear", scale=1)
 
     # -----------------------------------------------------------------------
     # Wire up events

@@ -10,12 +10,6 @@ from pathlib import Path
 # Local model settings
 # ---------------------------------------------------------------------------
 
-# Primary standalone multimodal model.
-MULTIMODAL_MODEL_ID: str = os.getenv(
-	"MULTIMODAL_MODEL_ID",
-	"HuggingFaceTB/SmolVLM-256M-Instruct",
-)
-
 # Resolve repo-local model path by default so local + Docker can run fully offline.
 _DEFAULT_LOCAL_MODEL_DIR = (
 	Path(__file__).resolve().parent.parent / "models" / "SmolVLM-256M-Instruct"
