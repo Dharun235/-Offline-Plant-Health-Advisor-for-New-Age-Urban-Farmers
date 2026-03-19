@@ -33,12 +33,16 @@ Main settings are in [chatbot/config.py](chatbot/config.py).
 
 Important environment variables:
 
-- `LOCAL_MULTIMODAL_MODEL_DIR` (default: `./models/SmolVLM-256M-Instruct`)
+- `LOCAL_MULTIMODAL_MODEL_DIR` (default prefers `./models/SmolVLM-256M-Instruct-Agri`, fallback to base model)
+- `FALLBACK_LOCAL_MODEL_DIR`
 - `HF_HUB_OFFLINE=1`
 - `TRANSFORMERS_OFFLINE=1`
 - `MAX_NEW_TOKENS`
 - `TEMPERATURE`
 - `MAX_HISTORY_TURNS`
+- `RAG_ENABLED`
+- `RAG_TOP_K`
+- `RAG_CORPUS_PATH`
 
 ## Docker (macOS and Raspberry Pi)
 
@@ -70,6 +74,26 @@ docker compose up --build
 
 Open http://localhost:7860
 
+## Fine-tuning for agriculture data
+
+Use the single notebook:
+
+[Full_Pipeline_Colab.ipynb](Full_Pipeline_Colab.ipynb)
+
+This notebook runs the complete workflow:
+
+- prepare dataset
+- build RAG corpus
+- fine-tune model
+- export and zip artifacts for download
+
+For macOS/no-CUDA, it automatically runs without CUDA quantization.
+
+After pipeline completes, app connection behavior is automatic:
+
+- If `models/SmolVLM-256M-Instruct-Agri` exists, the app uses it automatically.
+- Otherwise it falls back to `models/SmolVLM-256M-Instruct`.
+
 ## Raspberry Pi notes
 
 - Use 64-bit Raspberry Pi OS.
@@ -85,8 +109,24 @@ chatbot/
 ├── chatbot.py
 ├── config.py
 └── requirements.txt
+
+Full_Pipeline_Colab.ipynb
 ```
 
 ## License
 
 [MIT](LICENSE)
+
+## Model attribution
+
+This project uses the SmolVLM base model from Hugging Face TB:
+
+- https://huggingface.co/HuggingFaceTB/SmolVLM-256M-Instruct
+
+Fine-tuning implementation is based on the official Hugging Face reference notebook:
+
+- https://github.com/huggingface/smollm/blob/main/vision/finetuning/Smol_VLM_FT.ipynb
+
+Before redistribution, review the model card terms and license for the base model and any fine-tuned checkpoints.
+
+See also [MODEL_ATTRIBUTION.md](MODEL_ATTRIBUTION.md).

@@ -10,7 +10,8 @@ services:
     ports:
       - "7860:7860"
     environment:
-      LOCAL_MULTIMODAL_MODEL_DIR: ${LOCAL_MULTIMODAL_MODEL_DIR:-/models/SmolVLM-256M-Instruct}
+      LOCAL_MULTIMODAL_MODEL_DIR: ${LOCAL_MULTIMODAL_MODEL_DIR:-/models/SmolVLM-256M-Instruct-Agri}
+      FALLBACK_LOCAL_MODEL_DIR: ${FALLBACK_LOCAL_MODEL_DIR:-/models/SmolVLM-256M-Instruct}
       HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-1}
       TRANSFORMERS_OFFLINE: ${TRANSFORMERS_OFFLINE:-1}
       MAX_NEW_TOKENS: ${MAX_NEW_TOKENS:-256}
@@ -18,4 +19,5 @@ services:
       MAX_HISTORY_TURNS: ${MAX_HISTORY_TURNS:-4}
     volumes:
       - ./models:/models
+      - ./data:/app/data
     restart: unless-stopped

@@ -10,9 +10,16 @@ from pathlib import Path
 # Local model settings
 # ---------------------------------------------------------------------------
 
-# Resolve repo-local model path by default so local + Docker can run fully offline.
-_DEFAULT_LOCAL_MODEL_DIR = (
+# Resolve repo-local model paths.
+_DEFAULT_BASE_MODEL_DIR = (
 	Path(__file__).resolve().parent.parent / "models" / "SmolVLM-256M-Instruct"
+)
+_DEFAULT_FINETUNED_MODEL_DIR = (
+	Path(__file__).resolve().parent.parent / "models" / "SmolVLM-256M-Instruct-Agri"
+)
+
+_DEFAULT_LOCAL_MODEL_DIR = (
+	_DEFAULT_FINETUNED_MODEL_DIR if _DEFAULT_FINETUNED_MODEL_DIR.exists() else _DEFAULT_BASE_MODEL_DIR
 )
 
 # Optional local directory for fully offline deployment.
@@ -22,12 +29,29 @@ LOCAL_MULTIMODAL_MODEL_DIR: str = os.getenv(
 	str(_DEFAULT_LOCAL_MODEL_DIR),
 )
 
+# Fallback model folder (used if primary model path does not exist).
+FALLBACK_LOCAL_MODEL_DIR: str = os.getenv(
+	"FALLBACK_LOCAL_MODEL_DIR",
+	str(_DEFAULT_BASE_MODEL_DIR),
+)
+
 # Generation limits for local inference.
 MAX_NEW_TOKENS: int = int(os.getenv("MAX_NEW_TOKENS", "256"))
 TEMPERATURE: float = float(os.getenv("TEMPERATURE", "0.2"))
 
 # Keep only the latest N user/assistant turns when building prompt history.
 MAX_HISTORY_TURNS: int = int(os.getenv("MAX_HISTORY_TURNS", "4"))
+
+# ---------------------------------------------------------------------------
+# Optional local RAG settings
+# ---------------------------------------------------------------------------
+
+RAG_ENABLED: bool = os.getenv("RAG_ENABLED", "1").strip().lower() in {"1", "true", "yes"}
+RAG_TOP_K: int = int(os.getenv("RAG_TOP_K", "3"))
+RAG_CORPUS_PATH: str = os.getenv(
+	"RAG_CORPUS_PATH",
+	str(Path(__file__).resolve().parent.parent / "data" / "rag" / "corpus.jsonl"),
+)
 
 # ---------------------------------------------------------------------------
 # System prompt

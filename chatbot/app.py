@@ -19,7 +19,7 @@ import gradio as gr
 sys.path.insert(0, os.path.dirname(__file__))
 
 from chatbot import chat, check_backend_available, list_available_models
-from config import LOCAL_MULTIMODAL_MODEL_DIR
+from config import FALLBACK_LOCAL_MODEL_DIR, LOCAL_MULTIMODAL_MODEL_DIR
 
 # ---------------------------------------------------------------------------
 # Gradio event handlers
@@ -99,6 +99,8 @@ def _status_message() -> str:
         )
         if model_list:
             status += f"\nActive model source: {model_list}"
+        if FALLBACK_LOCAL_MODEL_DIR:
+            status += f"\nFallback model source: {FALLBACK_LOCAL_MODEL_DIR}"
     else:
         status = (
             "Local multimodal model is not ready. "

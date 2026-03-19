@@ -13,32 +13,48 @@ from PIL import Image
 import transformers
 
 from config import (
+    FALLBACK_LOCAL_MODEL_DIR,
     LOCAL_MULTIMODAL_MODEL_DIR,
     MAX_HISTORY_TURNS,
     MAX_NEW_TOKENS,
+    RAG_ENABLED,
+    RAG_TOP_K,
     SYSTEM_PROMPT,
     TEMPERATURE,
 )
+from rag import get_rag_context
 
 # Chat history type: list of (user_message, assistant_response) pairs.
 History = List[Tuple[str, str]]
 
 
 def _model_source() -> str:
-    model_dir = (LOCAL_MULTIMODAL_MODEL_DIR or "").strip()
-    if not model_dir:
+    primary = (LOCAL_MULTIMODAL_MODEL_DIR or "").strip()
+    fallback = (FALLBACK_LOCAL_MODEL_DIR or "").strip()
+
+    candidates: list[str] = []
+    if primary:
+        candidates.append(primary)
+    if fallback and fallback not in candidates:
+        candidates.append(fallback)
+
+    if not candidates:
         raise RuntimeError(
             "LOCAL_MULTIMODAL_MODEL_DIR is not set. "
             "For full offline mode, point it to your local model folder."
         )
 
-    resolved = Path(model_dir).expanduser().resolve()
-    if not resolved.exists():
-        raise FileNotFoundError(
-            f"Local model directory not found: {resolved}. "
-            "Download/copy SmolVLM files into this folder."
-        )
-    return str(resolved)
+    for model_dir in candidates:
+        resolved = Path(model_dir).expanduser().resolve()
+        if resolved.exists():
+            return str(resolved)
+
+    resolved_candidates = [str(Path(p).expanduser().resolve()) for p in candidates]
+    raise FileNotFoundError(
+        "No local model directory found. Checked: "
+        f"{', '.join(resolved_candidates)}. "
+        "Download/copy model files into one of these folders."
+    )
 
 
 @lru_cache(maxsize=1)
@@ -110,6 +126,25 @@ def _build_prompt_messages(
             "content": [{"type": "text", "text": SYSTEM_PROMPT}],
         }
     )
+
+    if RAG_ENABLED and user_text.strip():
+        rag_context = get_rag_context(user_text.strip(), top_k=RAG_TOP_K)
+        if rag_context:
+            messages.append(
+                {
+                    "role": "system",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                "Use this local agriculture reference context when relevant. "
+                                "If context is not enough, say uncertainty clearly.\n\n"
+                                f"{rag_context}"
+                            ),
+                        }
+                    ],
+                }
+            )
 
     for user_msg, assistant_msg in history_to_use:
         if user_msg:

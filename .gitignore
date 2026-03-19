@@ -38,6 +38,18 @@ chatbot/data/vectorstore/
 *.faiss
 *.pkl
 
+# Local training / generated data (keep repo lightweight)
+data/agriculture/train.jsonl
+data/agriculture/eval.jsonl
+data/agriculture/images/
+data/rag/corpus.jsonl
+
+# Training artifacts
+outputs/
+checkpoints/
+**/checkpoint-*/
+events.out.tfevents*
+
 # Logs
 *.log
 logs/
