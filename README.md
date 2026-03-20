@@ -29,12 +29,12 @@ hf download HuggingFaceTB/SmolVLM-256M-Instruct --local-dir ./models/SmolVLM-256
 cp .env.example .env
 ```
 
-3. In `.env`, keep these values (as requested):
+3. In `.env`, set your login values:
 
 ```env
 APP_AUTH_ENABLED=1
-APP_USERNAME=dharun
-APP_PASSWORD=dharun
+APP_USERNAME=appuser
+APP_PASSWORD=change-me
 ```
 
 4. Start:

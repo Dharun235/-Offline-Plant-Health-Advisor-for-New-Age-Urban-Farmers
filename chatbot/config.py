@@ -64,8 +64,8 @@ SERVER_PORT: int = int(os.getenv("SERVER_PORT", "7860"))
 GRADIO_SHARE: bool = os.getenv("GRADIO_SHARE", "0").strip().lower() in {"1", "true", "yes"}
 
 # Optional app auth for basic protection.
-APP_USERNAME: str = os.getenv("APP_USERNAME", "dharun").strip()
-APP_PASSWORD: str = os.getenv("APP_PASSWORD", "dharun").strip()
+APP_USERNAME: str = os.getenv("APP_USERNAME", "appuser").strip()
+APP_PASSWORD: str = os.getenv("APP_PASSWORD", "change-me").strip()
 APP_AUTH_ENABLED: bool = os.getenv("APP_AUTH_ENABLED", "1").strip().lower() in {"1", "true", "yes"}
 
 # ---------------------------------------------------------------------------
