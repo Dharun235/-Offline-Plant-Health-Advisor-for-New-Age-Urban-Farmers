@@ -54,6 +54,21 @@ RAG_CORPUS_PATH: str = os.getenv(
 )
 
 # ---------------------------------------------------------------------------
+# Server and access controls
+# ---------------------------------------------------------------------------
+
+SERVER_NAME: str = os.getenv("SERVER_NAME", "0.0.0.0")
+SERVER_PORT: int = int(os.getenv("SERVER_PORT", "7860"))
+
+# Optional Gradio share link (temporary public relay URL from Gradio service).
+GRADIO_SHARE: bool = os.getenv("GRADIO_SHARE", "0").strip().lower() in {"1", "true", "yes"}
+
+# Optional app auth for basic protection.
+APP_USERNAME: str = os.getenv("APP_USERNAME", "dharun").strip()
+APP_PASSWORD: str = os.getenv("APP_PASSWORD", "dharun").strip()
+APP_AUTH_ENABLED: bool = os.getenv("APP_AUTH_ENABLED", "1").strip().lower() in {"1", "true", "yes"}
+
+# ---------------------------------------------------------------------------
 # System prompt
 # ---------------------------------------------------------------------------
 SYSTEM_PROMPT: str = """You are an expert Plant Health Advisor and Urban Farming Assistant.

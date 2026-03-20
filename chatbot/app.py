@@ -19,7 +19,16 @@ import gradio as gr
 sys.path.insert(0, os.path.dirname(__file__))
 
 from chatbot import chat, check_backend_available, list_available_models
-from config import FALLBACK_LOCAL_MODEL_DIR, LOCAL_MULTIMODAL_MODEL_DIR
+from config import (
+    APP_AUTH_ENABLED,
+    APP_PASSWORD,
+    APP_USERNAME,
+    FALLBACK_LOCAL_MODEL_DIR,
+    GRADIO_SHARE,
+    LOCAL_MULTIMODAL_MODEL_DIR,
+    SERVER_NAME,
+    SERVER_PORT,
+)
 
 # ---------------------------------------------------------------------------
 # Gradio event handlers
@@ -90,6 +99,10 @@ def handle_send(user_text: str, image: str | None, history: List[dict] | None):
 
 def _status_message() -> str:
     """Build the status string shown at startup."""
+    auth_status = (
+        "Enabled" if APP_AUTH_ENABLED and APP_USERNAME and APP_PASSWORD else "Disabled"
+    )
+
     if check_backend_available():
         model_list = ", ".join(list_available_models())
         configured_source = LOCAL_MULTIMODAL_MODEL_DIR
@@ -97,6 +110,7 @@ def _status_message() -> str:
             "Local multimodal backend is ready. "
             f"Configured model: {configured_source}"
         )
+        status += f"\nLogin protection: {auth_status}"
         if model_list:
             status += f"\nActive model source: {model_list}"
         if FALLBACK_LOCAL_MODEL_DIR:
@@ -174,9 +188,14 @@ with gr.Blocks(
 
 
 if __name__ == "__main__":
+    auth_credentials = None
+    if APP_AUTH_ENABLED and APP_USERNAME and APP_PASSWORD:
+        auth_credentials = (APP_USERNAME, APP_PASSWORD)
+
     demo.launch(
-        server_name="0.0.0.0",
-        server_port=7860,
-        share=False,
+        server_name=SERVER_NAME,
+        server_port=SERVER_PORT,
+        share=GRADIO_SHARE,
+        auth=auth_credentials,
         theme=gr.themes.Soft(primary_hue="green"),
     )

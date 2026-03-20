@@ -17,6 +17,11 @@ services:
       MAX_NEW_TOKENS: ${MAX_NEW_TOKENS:-256}
       TEMPERATURE: ${TEMPERATURE:-0.2}
       MAX_HISTORY_TURNS: ${MAX_HISTORY_TURNS:-4}
+      APP_AUTH_ENABLED: ${APP_AUTH_ENABLED:-1}
+      APP_USERNAME: ${APP_USERNAME:-dharun}
+      APP_PASSWORD: ${APP_PASSWORD:-dharun}
+      SERVER_NAME: ${SERVER_NAME:-0.0.0.0}
+      SERVER_PORT: ${SERVER_PORT:-7860}
     volumes:
       - ./models:/models
       - ./data:/app/data
