@@ -47,6 +47,24 @@ docker compose up -d --build
 
 - Same Wi-Fi: http://<pi-ip>:7860
 
+## Hugging Face assets
+
+Use these uploaded repos:
+
+- Model: https://huggingface.co/Dharunkumar9/SmolVLM-256M-Instruct-Agri
+- Fine-tuning dataset: https://huggingface.co/datasets/Dharunkumar9/agri-vision-ft-dataset
+- RAG corpus dataset: https://huggingface.co/datasets/Dharunkumar9/agri-rag-corpus
+
+Example download commands:
+
+```bash
+hf download Dharunkumar9/SmolVLM-256M-Instruct-Agri --repo-type model --local-dir ./models/SmolVLM-256M-Instruct-Agri
+hf download Dharunkumar9/agri-rag-corpus --repo-type dataset --local-dir ./data/rag
+```
+
+This project is meant for offline deployment. Keep model files locally on the device.
+When available, the app prefers `./models/SmolVLM-256M-Instruct-Agri` and falls back to `./models/SmolVLM-256M-Instruct`.
+
 ## Files
 
 - [docker-compose.yml](docker-compose.yml)
