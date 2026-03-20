@@ -17,9 +17,10 @@ Open:
 
 ## Run with Docker (Raspberry Pi / Linux)
 
-1. Download model once:
+1. Download both models once (fine-tuned + base fallback):
 
 ```bash
+hf download Dharunkumar9/SmolVLM-256M-Instruct-Agri --repo-type model --local-dir ./models/SmolVLM-256M-Instruct-Agri
 hf download HuggingFaceTB/SmolVLM-256M-Instruct --local-dir ./models/SmolVLM-256M-Instruct
 ```
 
@@ -59,6 +60,7 @@ Example download commands:
 
 ```bash
 hf download Dharunkumar9/SmolVLM-256M-Instruct-Agri --repo-type model --local-dir ./models/SmolVLM-256M-Instruct-Agri
+hf download HuggingFaceTB/SmolVLM-256M-Instruct --local-dir ./models/SmolVLM-256M-Instruct
 hf download Dharunkumar9/agri-rag-corpus --repo-type dataset --local-dir ./data/rag
 ```
 
